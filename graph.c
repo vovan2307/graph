@@ -390,8 +390,10 @@ int traverse_graph_lines(Graph *graph, unsigned node, unsigned node2){
 			// То есть, если через потомка придти быстрее чем через предка, то есть мост
 			// между вершиной и потомком
 			if (graph[0].mintime[child] > graph[0].timein[node]){
+				count = graph[0].nbridge;
 				graph[0].bridges[count * 2] = node; graph[0].bridges[count * 2 + 1] = child;
 				count++; graph[0].nbridge++;
+				count = count;
 			}
 		}
 	}
