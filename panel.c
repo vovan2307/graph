@@ -20,11 +20,11 @@ void CreateMenu1(HWND parent){
 	AppendMenuW(mainmenu, MF_POPUP | MF_STRING, (UINT_PTR)graph, L"&Граф");
 
 	HMENU tasks = CreatePopupMenu();
-	AppendMenuW(tasks, MF_STRING, 1010, L"Задача 1");
-	AppendMenuW(tasks, MF_STRING, 1011, L"Задача 2");
-	AppendMenuW(tasks, MF_STRING, 1012, L"Задача 3");
-	AppendMenuW(tasks, MF_STRING, 1013, L"Задача 4");
-	AppendMenuW(tasks, MF_STRING, 1014, L"Задача 5");
+	AppendMenuW(tasks, MF_STRING, GETCOUNT_BUTTON, L"Компоненты связности");
+	AppendMenuW(tasks, MF_STRING, GETBRIDGES_BUTTON, L"Мосты");
+	AppendMenuW(tasks, MF_STRING, CHECKGRAPH_BUTTON, L"Возможна ли сильная ориентация");
+	AppendMenuW(tasks, MF_STRING, ORIENTLINKS_BUTTON, L"Сильная ориентация");
+	AppendMenuW(tasks, MF_STRING, ADDLINKS_BUTTON, L"Превращение в сильно связный граф");
 	AppendMenuW(mainmenu, MF_POPUP | MF_STRING, (UINT_PTR)tasks, L"&Задачи");
 
 	SetMenu(parent, mainmenu);
@@ -62,9 +62,10 @@ void ProcessMouseClick(HWND parent, UINT x, UINT y){
 
 void ProcessButton(HWND parent, UINT button){
 	deleteNode = addNode = FALSE;
-	static wchar_t buffer[260] = {0};
-	static unsigned nodes[2] = {-1};
-
+	wchar_t buffer[260] = {0};
+	unsigned nodes[2] = {-1};
+	unsigned connections = 0;
+	
 	if (button == ADD_NODE_BUTTON){
 		addNode = TRUE;
 	}
@@ -137,5 +138,30 @@ void ProcessButton(HWND parent, UINT button){
 			deleteLinkFromGraph(selected[0], selected[1]); // Удаляем ребро из графа
 		}
 		InvalidateRect(parent, NULL, TRUE);
+	}
+	Graph *graph = getGraph();
+	int i = 0, len=0;
+	if (button == GETCOUNT_BUTTON){
+		connections=graph_getConnectedCount(graph);
+		buffer[wsprintfW(buffer, L"Граф содержит %d компонент связности", connections)] = 0;
+		MessageBoxW(parent, buffer, L"Компоненты связности", MB_OK);
+	}
+	if (button == GETBRIDGES_BUTTON){
+		graph_getBridges(graph);
+		len += wsprintfW(buffer, L"Мосты графа: ");
+
+		if (graph[0].nbridge == 0) len += wsprintfW(buffer+len, L"нет");
+		else len += wsprintfW(buffer + len, L"\r\n");
+		
+		for (i = 0; i < graph[0].nbridge; i++){
+			len += wsprintfW(buffer+len, L"%d, %d\r\n", graph[0].bridges[i * 2] + 1, graph[0].bridges[i * 2 + 1] + 1);
+		}
+		
+		buffer[len] = 0;
+		MessageBoxW(parent, buffer, L"Мосты графа", MB_OK);
+	}
+	if (button == CHECKGRAPH_BUTTON){
+		if (graph[0].nbridge>0 || graph[0].nconn>1) MessageBoxW(parent, L"Сильная ориентация невозможна", L"", MB_OK);
+		else  MessageBoxW(parent, L"Сильная ориентация возможна", L"", MB_OK);
 	}
 }

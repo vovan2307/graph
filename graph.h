@@ -3,14 +3,20 @@
 
 #include <windows.h>
 
-#define ADD_NODE_BUTTON 0x200
-#define DELETE_NODE_BUTTON 0x201
-#define ADD_LINK_BUTTON 0x202
-#define DELETE_LINK_BUTTON 0x203
+#define ADD_NODE_BUTTON     0x200
+#define DELETE_NODE_BUTTON  0x201
+#define ADD_LINK_BUTTON     0x202
+#define DELETE_LINK_BUTTON  0x203
 
-#define SAVE_GRAPH_BUTTON 0x300
-#define LOAD_GRAPH_BUTTON 0x301
-#define EXIT_BUTTON       0x302
+#define SAVE_GRAPH_BUTTON   0x300
+#define LOAD_GRAPH_BUTTON   0x301
+#define EXIT_BUTTON         0x302
+
+#define GETCOUNT_BUTTON     0x400
+#define GETBRIDGES_BUTTON   0x401
+#define CHECKGRAPH_BUTTON   0x402
+#define ORIENTLINKS_BUTTON  0x403
+#define ADDLINKS_BUTTON     0x404
 
 typedef struct tag{
 	float x, y;
@@ -20,8 +26,16 @@ typedef struct tagGraph{
 	unsigned nodeCount, maxCount; // Количество узлов
 	GraphNode *nodes;  // Узлы графа
 
-	unsigned *adjMatrix; // Матрица смежности с весами рёбер
-	unsigned *buffer;  // Буфер в памяти для операций над матрицей смежности
+	unsigned *adjMatrix; // Матрица смежности
+	unsigned *incMatrix; // Списки ребер
+	unsigned *stack;
+	unsigned *visited;
+	unsigned *bridges;
+	unsigned timer;     // Для поиска мостов
+	unsigned *timein;   // Время захода поиска в глубину для узлов
+	unsigned *mintime;  // Минимальное время захода в каждый узел
+	unsigned nconn, nbridge; // Количество компонент связности, количество мостов
+	unsigned *buffer;     // Буфер в памяти для операций над матрицей смежности
 	unsigned selected[2]; // Выбранные узлы
 }Graph;
 
@@ -43,5 +57,8 @@ void loadGraphFromFile(wchar_t *filename); // Считать граф из файла
 void drawGraph(HDC hdc, const PAINTSTRUCT *ps); // Нарисовать граф в заданном окне
 int getNodeByPoint(unsigned x, unsigned y, RECT *area);
 
+// Ищет количество компонент связности
 int graph_getConnectedCount(Graph *graph);
+int graph_getBridges(Graph *graph);
+
 #endif

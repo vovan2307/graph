@@ -7,20 +7,32 @@ Graph graph = {0};
 const Graph *getGraph(){ return &graph; }
 
 void createGraph(){
-	unsigned elems =  graph.maxCount = 40;
-		
+	unsigned elems =  graph.maxCount = 50;
+	
+	graph.stack = malloc(elems*sizeof(unsigned) * 2);
+	graph.visited = graph.stack + elems;
+	memset(graph.stack, 0, elems*sizeof(unsigned) * 2);
+	
+	graph.bridges = malloc(elems*sizeof(unsigned) * 2);
+	memset(graph.bridges, 0, elems*sizeof(unsigned) * 2);
+
+	graph.timein = malloc(elems*sizeof(unsigned) * 2);
+	graph.mintime = graph.timein + elems;
+	memset(graph.timein, 0, elems*sizeof(unsigned) * 2);
+
 	elems *= elems;
 
 	// Выделяем память под внутренности графа
 	graph.nodes = malloc(elems*sizeof(GraphNode));  // Память под узлы
 	graph.adjMatrix = malloc(elems*sizeof(unsigned));  // Матрица смежности
-	graph.buffer = malloc(elems*sizeof(unsigned));   // Временный буфер для манипуляций с матрицей смежности
+	graph.incMatrix = malloc(elems*sizeof(unsigned));  // Матрица списков ребер
+	graph.buffer = malloc(elems*sizeof(unsigned));     // Буфер для матрицы смежности
 
 	graph.selected[0] = graph.selected[1] = -1; // Выделенных вершин пока нет
 
 	memset(graph.nodes, 0, elems*sizeof(GraphNode));
 	memset(graph.adjMatrix, -1, elems*sizeof(unsigned));     // Расстояния между вершинами не заданы и равны "бесконечности"
-	memset(graph.buffer, 0, elems*sizeof(unsigned));
+	memset(graph.incMatrix, -1, elems*sizeof(unsigned));     // Список смежности готовится по востребованию
 
 	for (unsigned i=0; i<graph.maxCount; i++){
 		graph.adjMatrix[i*graph.maxCount+i] = 0;  // Расстояние от вершины i к самой себе равно 0
@@ -240,25 +252,6 @@ void drawGraph(HDC hdc, const PAINTSTRUCT *ps){
 				// Рисуем ребро между узлами i и j
 				MoveToEx(hdc, x, y, NULL);
 				LineTo(hdc, x1, y1);
-
-				// Преобразуем вес ребра в текст
-				int len = wsprintfW(buffer, L"%d", graph.adjMatrix[i*graph.nodeCount+j]);
-				buffer[len] = 0;
-
-				textRegion.left = textRegion.right =
-					textRegion.top = textRegion.bottom = 0;
-				
-				// Вычисляем размер текста в пикселях
-				DrawTextW(hdc, buffer, len, &textRegion, DT_CALCRECT | DT_CENTER);
-				
-				// Перемещаем текст на середину ребра
-				textRegion.left = x+(x1-x)/2;
-				textRegion.top = y+(y1-y)/2;
-				textRegion.right += textRegion.left;
-				textRegion.bottom += textRegion.top;
-
-				// Рисуем текст
-				DrawTextW(hdc, buffer, len, &textRegion, DT_CENTER);
 			}
 		}
 
@@ -322,3 +315,98 @@ void selectNodeByPoint(unsigned px, unsigned py, RECT *area){
 }
 
 unsigned *getSelectedNodes(){ return graph.selected; }
+int findNextNode(Graph *graph, int parent, int current){
+	int i = 0, line = 0;
+	line = parent*graph[0].nodeCount;
+	
+	for (i = current + 1; i < graph[0].nodeCount; i++){
+		if (graph[0].adjMatrix[line + i]) break;
+	}
+
+	if (i == graph[0].nodeCount) return -1;
+	return i;
+}
+void graph_fillIncMatrix(Graph *graph){
+	int i = 0, j = 0, k=0, line=0;
+	for (i = 0, line = 0; i<graph[0].nodeCount; i++, line += graph[0].nodeCount){
+		for (j = 0, k = 0; j < graph[0].nodeCount; j++){
+			if (graph[0].adjMatrix[line + j] != -1) { graph[0].incMatrix[line + k] = j; k++; }
+		}
+		if (k < graph[0].nodeCount) graph[0].incMatrix[line + k] = -1;
+	}
+}
+int traverse_graph_nodes(Graph *graph, unsigned node){
+	int child = -1;
+	unsigned i = 0, line=node*graph[0].nodeCount;
+	if (node>graph[0].nodeCount) return 0;
+
+	if (graph[0].incMatrix[line] == -1) return 1;
+	if (graph[0].visited[node]) return 1;
+	graph[0].visited[node] = 1;
+
+	for (i=0;i<graph[0].nodeCount;i++){
+		child = graph[0].incMatrix[line + i];
+		if (child == -1) break;
+		traverse_graph_nodes(graph, child);
+	}
+	return 1;
+}
+int graph_getConnectedCount(Graph *graph){
+	unsigned i = 0, count = 0;
+	
+	graph_fillIncMatrix(graph);
+	graph[0].nconn = 0;
+	for (i = 0; i < graph[0].nodeCount; i++){graph[0].visited[i] = 0;}
+
+	for (i = 0; i < graph[0].nodeCount; i++){
+		if (graph[0].visited[i]) continue;
+		traverse_graph_nodes(graph, i);
+		count++;
+	}
+	graph[0].nconn = count;
+	return count;
+}
+int traverse_graph_lines(Graph *graph, unsigned node, unsigned node2){
+	unsigned i = 0, line=0, child=0, count=0;
+	graph[0].visited[node] = 1;
+	// Задаём время спуска к  вершине и минимальное время спуска к вершине
+	graph[0].timein[node] = graph[0].mintime[node] = graph[0].timer;
+	graph[0].timer++;
+	line = graph[0].nodeCount*node;
+	// Проход по соседям вершины
+	for (i = 0; i < graph[0].nodeCount; i++){
+		child = graph[0].incMatrix[line + i];
+		if (child==-1) break;
+		if (child == node2) continue;
+		// Если сосед уже посещён, обновляем min time для текущего узла
+		if (graph[0].visited[child]){
+			graph[0].mintime[node] = min(graph[0].mintime[node], graph[0].timein[child]);
+		}
+		else{// Спускаемся к потомку
+			traverse_graph_lines(graph, child, node);
+			// Проверяем можно ли придти к текущей вершины быстрее через её потомка
+			graph[0].mintime[node] = min(graph[0].mintime[node], graph[0].mintime[child]);
+			// Если нашли мост, добавляем его в список
+			// То есть, если через потомка придти быстрее чем через предка, то есть мост
+			// между вершиной и потомком
+			if (graph[0].mintime[child] > graph[0].timein[node]){
+				graph[0].bridges[count * 2] = node; graph[0].bridges[count * 2 + 1] = child;
+				count++; graph[0].nbridge++;
+			}
+		}
+	}
+	return 1;
+}
+int graph_getBridges(Graph *graph){
+	unsigned i = 0;
+	graph_fillIncMatrix(graph);
+	graph[0].timer = 0; graph[0].nbridge = 0;
+	
+	for (i = 0; i < graph[0].nodeCount; i++){ graph[0].visited[i] = 0; }
+
+	for (i = 0; i < graph[0].nodeCount; i++){
+		if (graph[0].visited[i]==0) traverse_graph_lines(graph, i, -1);
+	}
+
+	return 1;
+}

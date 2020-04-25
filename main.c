@@ -26,7 +26,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
 	wc.hInstance            = hInstance;
 	wc.hbrBackground		= CreateSolidBrush(RGB(0,0,200)); // Синий фон
 	wc.hCursor				= LoadCursor(wc.hInstance, IDC_ARROW);
-	wc.lpszClassName        = L"Floid-Warshall";
+	wc.lpszClassName        = L"Graph-Window";
 	
 	// Узнаём разрешение экрана
 	width=GetSystemMetrics(SM_CXSCREEN);
