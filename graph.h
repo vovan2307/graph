@@ -28,6 +28,7 @@ typedef struct tagGraph{
 
 	unsigned *adjMatrix; // Матрица смежности
 	unsigned *incMatrix; // Списки ребер
+	int *lens;           // Длина каждого списка ребер
 	unsigned *stack;
 	unsigned *visited;
 	unsigned *bridges;
@@ -58,7 +59,9 @@ void drawGraph(HDC hdc, const PAINTSTRUCT *ps); // Нарисовать граф в заданном ок
 int getNodeByPoint(unsigned x, unsigned y, RECT *area);
 
 // Ищет количество компонент связности
-int graph_getConnectedCount(Graph *graph);
-int graph_getBridges(Graph *graph);
+int graph_getConnectedCount(Graph *graph, int fill);
+int graph_getBridges(Graph *graph, int fill);
+int graph_orientLinks(Graph *graph, int fill);
+int graph_addLinks(Graph *graph, int fill);
 
 #endif

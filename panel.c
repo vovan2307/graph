@@ -23,8 +23,6 @@ void CreateMenu1(HWND parent){
 	AppendMenuW(tasks, MF_STRING, GETCOUNT_BUTTON, L"Компоненты связности");
 	AppendMenuW(tasks, MF_STRING, GETBRIDGES_BUTTON, L"Мосты");
 	AppendMenuW(tasks, MF_STRING, CHECKGRAPH_BUTTON, L"Возможна ли сильная ориентация");
-	AppendMenuW(tasks, MF_STRING, ORIENTLINKS_BUTTON, L"Сильная ориентация");
-	AppendMenuW(tasks, MF_STRING, ADDLINKS_BUTTON, L"Превращение в сильно связный граф");
 	AppendMenuW(mainmenu, MF_POPUP | MF_STRING, (UINT_PTR)tasks, L"&Задачи");
 
 	SetMenu(parent, mainmenu);
@@ -142,12 +140,12 @@ void ProcessButton(HWND parent, UINT button){
 	Graph *graph = getGraph();
 	int i = 0, len=0;
 	if (button == GETCOUNT_BUTTON){
-		connections=graph_getConnectedCount(graph);
+		connections=graph_getConnectedCount(graph, 1);
 		buffer[wsprintfW(buffer, L"Граф содержит %d компонент связности", connections)] = 0;
 		MessageBoxW(parent, buffer, L"Компоненты связности", MB_OK);
 	}
 	if (button == GETBRIDGES_BUTTON){
-		graph_getBridges(graph);
+		graph_getBridges(graph, 1);
 		len += wsprintfW(buffer, L"Мосты графа: ");
 
 		if (graph[0].nbridge == 0) len += wsprintfW(buffer+len, L"нет");
