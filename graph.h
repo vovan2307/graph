@@ -30,8 +30,10 @@ typedef struct tagGraph{
 	unsigned *incMatrix; // Списки ребер
 	int *lens;           // Длина каждого списка ребер
 	unsigned *stack;
-	unsigned *visited;
-	unsigned *bridges;
+	unsigned *visited;  // Посещённые вершины
+	unsigned *bridges;  // Мосты
+	unsigned *lines;    // Рёбра
+	unsigned cut[2];    // 2 ребра, которые надо пропустить при обходе графа
 	unsigned timer;     // Для поиска мостов
 	unsigned *timein;   // Время захода поиска в глубину для узлов
 	unsigned *mintime;  // Минимальное время захода в каждый узел

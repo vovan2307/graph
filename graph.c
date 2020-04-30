@@ -12,9 +12,9 @@ void createGraph(){
 	graph.lens = buffer;
 	graph.stack = graph.lens+elems;
 	graph.visited = graph.stack + elems;
-	memset(graph.stack, 0, elems*sizeof(unsigned) * 3);
+	memset(graph.stack, 0, elems*sizeof(unsigned) * 4);
 	
-	graph.bridges = graph.stack+elems;
+	graph.bridges = graph.visited+elems*2;
 	memset(graph.bridges, 0, elems*sizeof(unsigned) * 2);
 
 	graph.timein = graph.bridges+elems*2;
@@ -126,22 +126,7 @@ void deleteNodeFromGraph(int node){
 // Вес ребра ограничен значением 4096, отсчёт вершин начинается с 0
 void addLinkToGraph(unsigned start, unsigned end, unsigned weight){
 	if (start >= graph.nodeCount || end >= graph.nodeCount || weight > 0x1000 || start==end) return;
-	int i=0, j=0, line = start*graph.nodeCount;
-
-	if (graph.adjMatrix[line + end] != -1) i = 1;
-	graph.adjMatrix[line+end] = graph.adjMatrix[end*graph.nodeCount+start] = weight;
-
-	for (i = graph.lens[start]; i > 0; i--){
-		if (graph.incMatrix[line + i - 1] < end) break;
-		graph.incMatrix[line + i] = graph.incMatrix[line + i - 1];
-	}
-	graph.incMatrix[line + i] = end; graph.lens[start]++;
-
-	for (i = graph.lens[start], line = end*graph.nodeCount; i > 0; i--){
-		if (graph.incMatrix[line + i - 1] < start) break;
-		graph.incMatrix[line + i] = graph.incMatrix[line + i - 1];
-	}
-	graph.incMatrix[line + i] = start; graph.lens[end]++;
+	graph.adjMatrix[start*graph.nodeCount + end] = graph.adjMatrix[end*graph.nodeCount + start] = weight;
 }
 
 // Отсчёт вершин начинается с 0
@@ -150,31 +135,6 @@ void deleteLinkFromGraph(unsigned start, unsigned end){
 	
 	if (graph.adjMatrix[start*graph.nodeCount + end] == -1) return;
 	graph.adjMatrix[start*graph.nodeCount+end] = graph.adjMatrix[end*graph.nodeCount+start] = -1;
-	
-	int i = 0, j = 0, line = start*graph.nodeCount;
-
-	if (graph.lens[start] == 0 || graph.lens[end] == 0) return;
-	
-	for (i = 0; i<graph.lens[start]; i++){
-		j = graph.incMatrix[line + i];
-		if (j == end) break;
-	}
-	if (i == graph.lens[start]) return;
-	for (;i<graph.lens[start]-1; i++){
-		graph.incMatrix[line + i]=graph.incMatrix[line+i+1];
-	}
-	
-	if (i>=0) graph.incMatrix[line+i] = -1; if (graph.lens[start]>0) graph.lens[start]--;
-
-	for (i = 0,line=end*graph.nodeCount; i<graph.lens[end]-1; i++){
-		j = graph.incMatrix[line + i];
-		if (j == start) break;
-	}
-	if (i == graph.lens[end]) return;
-	for (; i<graph.lens[end]; i++){
-		graph.incMatrix[line + i] = graph.incMatrix[line + i + 1];
-	}
-	if (i >= 0) graph.incMatrix[line + i] = -1; if (graph.lens[end]>0) graph.lens[end]--;
 }
 
 
@@ -371,7 +331,7 @@ void graph_fillIncMatrix(Graph *graph){
 	for (i = 0, line = 0; i<graph[0].nodeCount; i++, line += graph[0].nodeCount){
 		for (j = 0, k = 0; j < graph[0].nodeCount; j++){
 			elem=graph[0].adjMatrix[line + j];
-			if (elem == -1) continue;
+			if (j==i || elem == -1) continue;
 			graph[0].incMatrix[line + k] = j; k++;
 		}
 		graph[0].lens[i] = k;
@@ -382,12 +342,12 @@ int traverse_graph_nodes(Graph *graph, unsigned node){
 	unsigned i = 0, line=node*graph[0].nodeCount;
 	if (node>graph[0].nodeCount) return 0;
 
-	if (graph[0].incMatrix[line] == -1) return 1;
 	if (graph[0].visited[node]) return 1;
 	graph[0].visited[node] = 1;
 
 	for (i=0;i<graph[0].lens[node];i++){
 		child = graph[0].incMatrix[line + i];
+		if (graph[0].visited[child]) continue;
 		traverse_graph_nodes(graph, child);
 	}
 	return 1;
@@ -397,6 +357,7 @@ int graph_getConnectedCount(Graph *graph, int fill){
 	
 	if (fill) graph_fillIncMatrix(graph);
 	graph[0].nconn = 0;
+
 	for (i = 0; i < graph[0].nodeCount; i++){graph[0].visited[i] = 0;}
 
 	for (i = 0; i < graph[0].nodeCount; i++){
@@ -404,7 +365,6 @@ int graph_getConnectedCount(Graph *graph, int fill){
 		traverse_graph_nodes(graph, i);
 		count++;
 	}
-	graph[0].nconn = count;
 	return count;
 }
 int traverse_graph_lines(Graph *graph, unsigned node, unsigned node2){
@@ -416,8 +376,8 @@ int traverse_graph_lines(Graph *graph, unsigned node, unsigned node2){
 	line = graph[0].nodeCount*node;
 	// Проход по соседям вершины
 	for (i = 0; i < graph[0].lens[node]; i++){
-		child = graph[0].incMatrix[line + i];		
-		if (child == node2) continue;
+		child = graph[0].incMatrix[line + i];
+		if (child == node2 || child==node) continue;
 		// Если сосед уже посещён, обновляем min time для текущего узла
 		if (graph[0].visited[child]){
 			graph[0].mintime[node] = min(graph[0].mintime[node], graph[0].timein[child]);
@@ -440,53 +400,33 @@ int traverse_graph_lines(Graph *graph, unsigned node, unsigned node2){
 	return 1;
 }
 int graph_getBridges(Graph *graph, int fill){
-	unsigned i = 0;
-	if (fill) graph_fillIncMatrix(graph);
+	unsigned i = 0, j = 0, line = 0, child = 0;
+	unsigned conn = 0, conn1=0, count=0;
+	unsigned *visited2 = graph[0].visited + graph[0].nodeCount;
+
 	graph[0].timer = 0; graph[0].nbridge = 0;
-	
-	for (i = 0; i < graph[0].nodeCount; i++){ graph[0].visited[i] = 0; }
 
-	for (i = 0; i < graph[0].nodeCount; i++){
-		if (graph[0].visited[i]==0) traverse_graph_lines(graph, i, -1);
+	graph[0].cut[0] = graph[0].cut[1] = -1;
+	conn = graph_getConnectedCount(graph, 1);
+
+	for (i = 0; i < graph[0].nodeCount; i++){graph[0].visited[graph[0].nodeCount + i] = 0;}
+	// Цикл по ребрам графа
+	for (i = 0, line=0; i < graph[0].nodeCount; i++, line += graph[0].nodeCount){
+		for (j = 0; j < graph[0].lens[i]; j++){
+			child = graph[0].incMatrix[line+j];
+			if (child == i || child<i) continue;
+			deleteLinkFromGraph(i, child);
+			graph_fillIncMatrix(graph);
+			// Если удаление удаление ребра не вызвало увеличение количества компонент связности, то это не мост
+			conn1=graph_getConnectedCount(graph, 0);
+			addLinkToGraph(i, child, 1);
+			graph_fillIncMatrix(graph);
+			if (conn1 > conn); else continue;
+			graph[0].bridges[count * 2] = i; graph[0].bridges[count * 2 + 1] = child;
+			count++; graph[0].nbridge++;
+		}
+		visited2[i] = 1;
 	}
-
+	graph[0].cut[0] = graph[0].cut[1] = -1;
 	return 1;
-}
-int Orient(Graph *graph, unsigned node){
-	unsigned i = 0, line=node*graph[0].nodeCount;
-	unsigned child = 0;
-	graph[0].visited[node] = 1;
-	for (i = 0; i < graph[0].nodeCount; i++){
-		child=graph[0].incMatrix[line + i];
-		if (child == -1) break;
-	}
-
-}
-int graph_orientLinks(Graph *graph, int fill){
-	if (graph[0].nconn != 1 || graph[0].nbridge > 0) return 0;
-	unsigned i = 0;
-
-	for (i = 0; i < graph[0].nodeCount; i++) graph[0].visited[i] = 0;
-
-	for (i = 0; i < graph[0].nodeCount; i++) {
-		if (graph[0].visited[i]) continue;
-	}
-}
-
-int graph_addLinks(Graph *graph, int fill){
-	if (fill) graph_fillIncMatrix(graph);
-	unsigned i = 0, child=0, line=0;
-	
-	graph_getConnectedCount(graph, 0); // Считаем количество компонент связности
-	graph_getBridges(graph, 0); // Считаем количество мостов
-	// Если 1 компонента связности и нет мостов, то добавлять рёбра не надо
-	
-	if (graph[0].nconn == 1 && graph[0].nbridge == 0) return 0;
-
-	for (i = 0; i < graph[0].nodeCount; i++) graph[0].visited[i] = 0;
-	for (i = 0, line = 0; i < graph[0].nodeCount; i++, line += graph[0].nodeCount){
-		if (graph[0].incMatrix[line] != -1) continue;
-		graph[0].incMatrix[line] = i;
-
-	}
 }

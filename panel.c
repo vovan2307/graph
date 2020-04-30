@@ -140,12 +140,14 @@ void ProcessButton(HWND parent, UINT button){
 	Graph *graph = getGraph();
 	int i = 0, len=0;
 	if (button == GETCOUNT_BUTTON){
+		graph[0].cut[0] = graph[0].cut[1] = -1;
 		connections=graph_getConnectedCount(graph, 1);
 		buffer[wsprintfW(buffer, L"Граф содержит %d компонент связности", connections)] = 0;
 		MessageBoxW(parent, buffer, L"Компоненты связности", MB_OK);
 	}
 	if (button == GETBRIDGES_BUTTON){
-		graph_getBridges(graph, 1);
+		graph[0].cut[0] = graph[0].cut[1] = -1;
+		graph_getBridges(graph, 0);
 		len += wsprintfW(buffer, L"Мосты графа: ");
 
 		if (graph[0].nbridge == 0) len += wsprintfW(buffer+len, L"нет");
@@ -161,5 +163,8 @@ void ProcessButton(HWND parent, UINT button){
 	if (button == CHECKGRAPH_BUTTON){
 		if (graph[0].nbridge>0 || graph[0].nconn>1) MessageBoxW(parent, L"Сильная ориентация невозможна", L"", MB_OK);
 		else  MessageBoxW(parent, L"Сильная ориентация возможна", L"", MB_OK);
+	}
+	if (button == EXIT_BUTTON){
+		SendMessageW(parent, WM_CLOSE, 0, 0);
 	}
 }
